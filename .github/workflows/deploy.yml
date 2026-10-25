@@ -1,3 +1,4 @@
+
 name: Deploy React Vite App to GitHub Pages
 
 on:
@@ -21,16 +22,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm install
+        run: bun install --frozen-lockfile
 
-      - name: Build production bundle (Vite React SPA)
-        run: npm run build
+      - name: Build production bundle
+        run: bun run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
