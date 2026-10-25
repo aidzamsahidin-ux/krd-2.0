@@ -4,9 +4,8 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(({ command }) => {
-  // Gunakan '/krd-2.0/' semasa build untuk GitHub Pages, dan '/' semasa dev preview
-  const base = command === 'build' ? '/krd-2.0/' : '/';
+export default defineConfig(() => {
+  const base = './';
 
   return {
     base,

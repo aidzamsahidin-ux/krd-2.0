@@ -1,1 +1,1 @@
-# Dummy .nojekyll file to prevent GitHub Pages from ignoring files/folders starting with underscores
+# Disable Jekyll processing on GitHub Pages
