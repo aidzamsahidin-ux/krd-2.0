@@ -4,8 +4,12 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
+  // Gunakan '/krd-2.0/' semasa build untuk GitHub Pages, dan '/' semasa dev preview
+  const base = command === 'build' ? '/krd-2.0/' : '/';
+
   return {
+    base,
     plugins: [
       react(),
       tailwindcss(),
@@ -13,30 +17,30 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
         manifest: {
-          id: '/',
+          id: base,
           name: 'CirculoX Pintar - Kit Roda Darab',
           short_name: 'CirculoX',
           description: 'Kit Roda Darab Interaktif & Sistem Pengurusan Bilik Darjah (PdP & Pembelajaran Kendiri)',
           theme_color: '#4f46e5',
           background_color: '#f8fafc',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: base,
+          scope: base,
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: 'pwa-maskable-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
