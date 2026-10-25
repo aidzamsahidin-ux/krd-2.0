@@ -1,0 +1,21 @@
+{
+"name": "CirculoX - Kit Roda Darab",
+"short_name": "CirculoX",
+"start_url": ".",
+"display": "standalone",
+"background_color": "#e0e7ff",
+"theme_color": "#4f46e5",
+"description": "CirculoX: Inovasi Pendaraban Interaktif",
+"icons": [
+{
+"src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzRmNDZlNSIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTYwIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yNTYgMTYwdjE5Mm0tOTYtOTZoMTkyIiBzdHJva2U9IiM0ZjQ2ZTUiIHN0cm9rZS13aWR0aD0iNDAiLz48L3N2Zz4=",
+"sizes": "192x192",
+"type": "image/png"
+},
+{
+"src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzRmNDZlNSIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTYwIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yNTYgMTYwdjE5Mm0tOTYtOTZoMTkyIiBzdHJva2U9IiM0ZjQ2ZTUiIHN0cm9rZS13aWR0aD0iNDAiLz48L3N2Zz4=",
+"sizes": "512x512",
+"type": "image/png"
+}
+]
+}

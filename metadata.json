@@ -1,0 +1,6 @@
+{
+  "name": "CirculoX Pintar - Kit Roda Darab & Sistem PdP",
+  "description": "Ekosistem pembelajaran sifir interaktif berasaskan Rumus Kit Roda Darab (KRD), Latihan Kendiri 2-Langkah, Kuiz LCD, dan Sinergi Pengimbas QR Bilik Darjah.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

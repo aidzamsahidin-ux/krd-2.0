@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- PWA Meta Tags -->
+    <title>CirculoX by dz.</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CirculoX">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Kit Roda Darab Interaktif & Sistem Pengurusan Bilik Darjah">
+
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700;900&display=swap');
+
+        :root {
+            --primary: #312e81; 
+            --accent: #4f46e5;
+            --bg-gradient: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            color: #111827;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        @media (min-width: 1024px) {
+            body { height: 100vh; overflow: hidden; }
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+        }
+
+        .mnl-active {
+            background: var(--accent) !important;
+            color: white !important;
+            transform: scale(1.15);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+            z-index: 10;
+        }
+
+        .mnl-item { width: 2.5rem; height: 2.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @media (min-width: 1024px) {
+            .mnl-item { width: 4rem; height: 4rem; border-width: 3px; }
+            .mnl-item span:first-child { font-size: 1.25rem !important; }
+            .mnl-item span:last-child { font-size: 0.75rem !important; }
+        }
+
+        .step-box {
+            border-left: 6px solid var(--accent); background: #ffffff; padding: 1.25rem;
+            border-radius: 1rem; margin-bottom: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .wheel-label, .ans-label { pointer-events: none; font-weight: 800; }
+        .sector-highlight { stroke: var(--accent); stroke-width: 5px; fill: #e0e7ff !important; }
+
+        .lcd-timer {
+            font-size: clamp(6rem, 20vw, 16rem); line-height: 0.9; font-weight: 900; color: #ffffff;
+            text-shadow: 0 10px 40px rgba(0,0,0,0.2); letter-spacing: -0.05em;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+
+        @media print {
+            body > *:not(#printArea) { display: none !important; }
+            #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%; background: white; z-index: 9999; }
+            .page-break { page-break-after: always; display: block; min-height: 100vh; position: relative; padding: 20px; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+
+        #reader, #remoteScannerVideo { width: 100% !important; border-radius: 1.5rem; overflow: hidden; background: #000; }
+        
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeInUp 0.4s ease-out forwards; }
+
+        .leaderboard-item { transition: all 0.5s ease-out; transform: translateY(20px); opacity: 0; }
+        .leaderboard-item.show { transform: translateY(0); opacity: 1; }
+
+        @keyframes podium-rise { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .podium-bar { animation: podium-rise 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        .podium-1 { animation-delay: 0.5s; }
+        .podium-2 { animation-delay: 0.2s; }
+        .podium-3 { animation-delay: 0.8s; }
+
+        #toast-notification {
+            position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
+            background-color: #10b981; color: white; padding: 0.75rem 1.5rem;
+            border-radius: 9999px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+            display: flex; align-items: center; gap: 0.75rem; z-index: 9999;
+            opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            white-space: nowrap; pointer-events: none;
+        }
+        #toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="flex flex-col text-sm md:text-base selection:bg-indigo-200">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center p-3 md:p-4 no-print shrink-0 bg-white/70 backdrop-blur-xl border-b border-indigo-100 z-30 sticky top-0 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg transform rotate-3">C</div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-black text-indigo-900 leading-none tracking-tight">CirculoX</h1>
+                <p id="connectionStatus" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">OFFLINE MODE</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="openSynergyModal()" class="p-2.5 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 hover:shadow-lg transition-all flex items-center gap-2 active:scale-95" title="Sinergi (Connect Phone)">
+                <span class="text-lg">📡</span> <span class="hidden md:inline font-bold">Sinergi</span>
+            </button>
+            <button onclick="openLCDMode()" class="p-2.5 bg-indigo-900 text-white rounded-xl shadow-md hover:bg-black hover:shadow-lg transition-all flex items-center gap-2 active:scale-95" title="Paparan LCD">
+                <span class="text-lg">🖥️</span> <span class="hidden md:inline font-bold">LCD</span>
+            </button>
+            <button onclick="openStudentManager()" class="p-2.5 bg-emerald-600 text-white rounded-xl shadow-md hover:bg-emerald-700 hover:shadow-lg transition-all flex items-center gap-2 active:scale-95" title="Rekod & PDF">
+                <span class="text-lg">👥</span> <span class="hidden md:inline font-bold">Data</span>
+            </button>
+            <button onclick="toggleScanner()" class="p-2.5 bg-amber-500 text-white rounded-xl shadow-md hover:bg-amber-600 hover:shadow-lg transition-all flex items-center gap-2 active:scale-95" title="Imbas QR">
+                <span class="text-lg">📷</span> <span class="hidden md:inline font-bold">Scan</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow flex flex-col lg:grid lg:grid-cols-12 gap-4 p-3 md:p-6 lg:overflow-hidden no-print">
+        
+        <!-- Left: Controls & Config -->
+        <aside class="lg:col-span-3 flex flex-col gap-4 lg:overflow-hidden animate-fade-up">
+            <div class="glass-card p-5 rounded-[2rem] border-b-4 border-indigo-500">
+                <div class="space-y-3">
+                    <label class="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Tetapan Murid</label>
+                    <select id="classDropdown" onchange="loadStudentsByClass()" class="w-full bg-indigo-50/50 border-2 border-indigo-100 rounded-xl px-4 py-2.5 font-bold text-indigo-900 text-sm outline-none focus:border-indigo-500 transition-colors cursor-pointer">
+                        <option value="">Pilih Kelas...</option>
+                    </select>
+                    <select id="studentDropdown" onchange="selectStudentFromList()" class="w-full bg-white border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-700 text-sm outline-none focus:border-indigo-500 transition-colors cursor-pointer">
+                        <option value="">Pilih Murid...</option>
+                    </select>
+                </div>
+                <div id="activeStudentInfo" class="mt-4 pt-4 border-t border-dashed border-indigo-200 hidden">
+                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Sedang Aktif</p>
+                    <div id="studentDetail">
+                        <p id="dispName" class="text-lg font-black text-indigo-900 leading-tight truncate"></p>
+                        <p id="dispClass" class="text-xs font-bold text-indigo-500"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-5 rounded-[2rem] lg:flex-grow lg:overflow-y-auto custom-scroll space-y-6">
+                <div>
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Mod Interaksi</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setMode('learn')" id="btnLearn" class="py-3.5 rounded-xl font-bold text-sm border-2 border-indigo-600 bg-indigo-600 text-white shadow-lg transition-transform active:scale-95">Belajar</button>
+                        <button onclick="setMode('practice')" id="btnPractice" class="py-3.5 rounded-xl font-bold text-sm border-2 border-indigo-100 text-indigo-900 hover:bg-indigo-50 transition-transform active:scale-95">Latihan</button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Pilih Sifir</h3>
+                    <div class="grid grid-cols-3 gap-2">
+                        <script>
+                            for(let i=1; i<=9; i++) document.write(`<button onclick="selectSifir(${i})" id="sifir-${i}" class="sifir-btn h-12 rounded-xl font-black text-lg border-2 border-gray-100 bg-white hover:border-indigo-400 text-gray-600 transition-all hover:-translate-y-0.5 shadow-sm">${i}</button>`);
+                        </script>
+                    </div>
+                </div>
+                <div id="scoreCard" class="hidden bg-white p-4 rounded-2xl border-2 border-emerald-100 border-b-4 border-b-emerald-500">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-black text-emerald-800 text-xs uppercase tracking-wider">Skor</span>
+                        <span class="text-2xl font-black text-emerald-600" id="currentScore">0/0</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-emerald-50 p-2.5 rounded-xl">
+                        <span class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">MASA</span>
+                        <span class="text-lg font-mono font-black text-emerald-800" id="timerDisplay">00:00</span>
+                    </div>
+                </div>
+                <button onclick="resetApp()" class="w-full py-2.5 text-gray-400 font-bold text-[10px] uppercase hover:text-red-500 transition-colors tracking-widest">Reset Sesi</button>
+            </div>
+        </aside>
+
+        <!-- Center: Visualization -->
+        <article class="lg:col-span-5 flex flex-col gap-4 lg:overflow-hidden relative animate-fade-up" style="animation-delay: 0.1s">
+            <div class="glass-card p-4 rounded-[2rem] border-t-4 border-indigo-600 overflow-x-auto custom-scroll shrink-0">
+                <h3 class="text-center font-black text-indigo-900 mb-3 text-[10px] uppercase tracking-widest">Garis Nombor Ajaib</h3>
+                <div class="flex justify-between items-center gap-2 md:px-2 min-w-[350px] lg:min-w-0">
+                    <script>
+                        const mnlArr = ["+1", "+2", "+3", "+4", "±5", "-4", "-3", "-2", "-1"];
+                        for(let i=1; i<=9; i++) {
+                            document.write(`<div id="mnl-${i}" class="mnl-item rounded-full bg-white border-2 border-gray-200 flex flex-col items-center justify-center transition-all shrink-0 shadow-sm"><span class="text-xs md:text-sm font-black text-indigo-900">${i}</span><span class="text-[8px] md:text-[10px] font-bold text-indigo-500">${mnlArr[i-1]}</span></div>`);
+                        }
+                    </script>
+                </div>
+            </div>
+            <div class="flex-grow flex items-center justify-center p-4 min-h-[300px]">
+                <div id="wheelWrapper" class="relative w-full aspect-square max-w-[420px] bg-white rounded-full shadow-2xl border-4 border-dashed border-indigo-100 flex items-center justify-center mx-auto transition-transform duration-500 hover:scale-[1.02]">
+                    <span class="text-gray-300 font-black text-center p-10 text-xl uppercase tracking-widest animate-pulse">Pilih Sifir</span>
+                </div>
+            </div>
+        </article>
+
+        <!-- Right: Guide -->
+        <aside class="lg:col-span-4 flex flex-col lg:overflow-hidden animate-fade-up" style="animation-delay: 0.2s">
+            <div id="guidePanel" class="glass-card p-6 rounded-[2rem] flex flex-col border-l-8 border-indigo-800 shadow-xl h-full lg:overflow-hidden">
+                <div id="guideContent" class="flex-grow lg:overflow-y-auto custom-scroll pr-2">
+                    <div class="text-center py-10 opacity-60">
+                        <div class="text-6xl mb-4">💡</div>
+                        <h2 class="text-xl font-black text-indigo-900 mb-2">Panduan PdP</h2>
+                        <p class="text-sm text-gray-500 font-bold leading-relaxed px-4">Sila pilih murid dan sifir di bahagian kiri untuk memulakan sesi pembelajaran interaktif.</p>
+                    </div>
+                </div>
+                <div id="guideActions" class="mt-4 flex flex-col gap-3 shrink-0"></div>
+            </div>
+        </aside>
+    </main>
+
+    <footer class="text-center py-2 text-[10px] font-bold text-gray-400 no-print">by dz.</footer>
+
+    <!-- MODALS -->
+    
+    <!-- 1. Student Manager -->
+    <div id="studentModal" class="fixed inset-0 bg-black/90 backdrop-blur-xl hidden z-50 flex flex-col items-center justify-center p-4">
+        <div class="glass-card w-full max-w-6xl p-6 md:p-8 rounded-[3rem] max-h-[95vh] flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center mb-4 px-2">
+                <h2 class="text-3xl font-black text-pdp-primary">Pengurusan Data</h2>
+                <button onclick="closeStudentManager()" class="text-gray-400 hover:text-red-600 text-4xl font-black">×</button>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-4 mb-6 px-2">
+                 <button onclick="exportDatabase()" class="px-6 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-black text-xs uppercase hover:bg-blue-100 transition-all flex items-center justify-center gap-2">Simpan Backup</button>
+                <button onclick="triggerImport()" class="px-6 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-black text-xs uppercase hover:bg-amber-100 transition-all flex items-center justify-center gap-2">Restore Data</button>
+                <input type="file" id="importFile" class="hidden" accept=".json" onchange="importDatabase(this)">
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden flex-grow px-2">
+                <div class="space-y-6 overflow-y-auto custom-scroll pr-2">
+                    <div class="p-6 bg-indigo-50 rounded-3xl border-2 border-indigo-100 space-y-4 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-black text-indigo-900 text-xs uppercase tracking-widest">Input Pukal</h3>
+                            <span class="text-[10px] text-indigo-400 font-bold">Nama, Kelas</span>
+                        </div>
+                        <textarea id="bulkInput" placeholder="Contoh:&#10;Ali Bin Abu, 4 Intan&#10;Siti Aminah, 4 Berlian" class="w-full h-32 px-5 py-4 rounded-2xl border-2 border-white outline-none font-bold text-sm resize-none focus:border-indigo-400"></textarea>
+                        <div class="flex gap-3">
+                            <button onclick="addBulkStudents()" class="flex-1 py-3.5 bg-indigo-700 text-white rounded-xl font-black text-sm hover:bg-indigo-800">Simpan Pukal</button>
+                            <button onclick="document.getElementById('bulkInput').value=''" class="px-4 py-3.5 bg-white text-gray-400 rounded-xl font-black text-sm border hover:text-red-500">Padam</button>
+                        </div>
+                    </div>
+                    <div id="studentListContainer" class="space-y-2"></div>
+                </div>
+                
+                <div class="bg-white border-4 border-indigo-50 rounded-[2.5rem] p-6 flex flex-col overflow-hidden">
+                    <h3 class="font-black text-emerald-700 text-xs uppercase tracking-widest mb-2 text-center">Rekod & Cetak</h3>
+                    <div class="bg-emerald-50 p-4 rounded-2xl mb-4 border border-emerald-100 flex gap-3 flex-col sm:flex-row">
+                        <select id="printClassSelect" class="flex-1 px-4 py-3 rounded-xl border-2 border-emerald-200 font-bold text-emerald-900 outline-none text-sm bg-white cursor-pointer"><option value="all">SEMUA KELAS</option></select>
+                        <button onclick="generateTestByClass()" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black shadow-md hover:bg-emerald-700 whitespace-nowrap">CETAK PDF</button>
+                    </div>
+                    <p class="text-[9px] text-center text-gray-400 font-bold mb-2 italic">PDF dijana lengkap dengan Roda Sifir 2-9 dan Kod QR unik.</p>
+                    <div id="gradebookList" class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-1"></div>
+                    <button onclick="clearAllData()" class="mt-4 text-[10px] text-red-400 font-bold uppercase underline text-center hover:text-red-600">Padam Semua Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Synergy Modal -->
+    <div id="synergyModal" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden z-[150] flex flex-col items-center justify-center p-6 text-center">
+        <div class="glass-card w-full max-w-md p-8 rounded-[3rem] animate-fade-up border-t-[15px] border-blue-600 relative">
+            <button onclick="closeSynergyModal()" class="absolute top-4 right-6 text-gray-400 hover:text-red-500 text-3xl font-black">×</button>
+            <h2 class="text-2xl font-black text-indigo-900 mb-2">Sinergi CirculoX</h2>
+            <p class="text-xs text-indigo-400 font-bold mb-6 uppercase tracking-widest">Sambungan Peranti (Internet Diperlukan)</p>
+            <div class="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
+                <button onclick="switchSynergyTab('host')" id="tabHost" class="flex-1 py-2 rounded-lg font-bold text-sm bg-white shadow-sm text-indigo-900">Saya LCD (Host)</button>
+                <button onclick="switchSynergyTab('client')" id="tabClient" class="flex-1 py-2 rounded-lg font-bold text-sm text-gray-500 hover:text-indigo-900">Saya Telefon</button>
+            </div>
+            <div id="synergyHostView" class="space-y-6">
+                <div class="p-6 bg-indigo-50 border-4 border-indigo-100 rounded-3xl inline-block">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">KOD SESI ANDA</p>
+                    <p id="synergyCodeDisplay" class="text-5xl font-black text-indigo-900 tracking-widest font-mono select-all">-----</p>
+                </div>
+                <button onclick="initSynergyHost()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-transform">Jana Kod Baru</button>
+            </div>
+            <div id="synergyClientView" class="hidden space-y-4">
+                <input type="text" id="sessionCodeInput" placeholder="Masukkan Kod 5-Digit" maxlength="5" class="w-full px-6 py-4 rounded-2xl border-2 border-indigo-100 text-center font-black text-2xl uppercase outline-none focus:border-indigo-500 placeholder-gray-300">
+                <button onclick="joinSynergySession()" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl hover:bg-blue-700 transition-all active:scale-95">SAMBUNG</button>
+            </div>
+            <div id="synergyLoading" class="hidden py-10">
+                <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="font-black text-indigo-300 animate-pulse">Sedang menyambung...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. LCD Mode -->
+    <div id="lcdModal" class="fixed inset-0 bg-indigo-950 hidden z-[100] flex flex-col p-6 text-center overflow-hidden">
+        <div class="flex justify-between items-start w-full mb-4 shrink-0">
+            <div class="text-left bg-indigo-900/50 p-4 rounded-2xl backdrop-blur-sm border border-indigo-700 flex items-center gap-4 cursor-pointer hover:bg-indigo-800/50 transition-colors group" onclick="openSynergyModal()">
+                <div class="bg-white/10 p-2 rounded-lg w-12 h-12 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-colors">📡</div>
+                <div><p class="text-indigo-300 text-xs font-bold uppercase tracking-wider mb-0.5">Status Remote</p><p id="lcdRemoteStatus" class="text-white font-black text-sm leading-tight uppercase">Belum Sambung</p></div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <button onclick="closeLCDMode()" class="text-indigo-400 hover:text-white text-4xl font-black transition-colors p-2">×</button>
+                <div class="flex items-center gap-2 bg-indigo-900/50 p-2 rounded-xl">
+                    <label class="text-indigo-300 text-xs font-bold uppercase pl-2">Filter Kelas:</label>
+                    <select id="lcdClassFilter" onchange="filterLeaderboard()" class="bg-indigo-900 text-white border border-indigo-600 rounded-lg px-3 py-1 font-bold text-sm outline-none cursor-pointer hover:border-indigo-400 transition-colors"><option value="all">SEMUA</option></select>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-col flex-grow items-center justify-center w-full overflow-hidden gap-6 relative">
+            <div id="podiumView" class="hidden absolute inset-0 bg-indigo-950 z-20 flex flex-col items-center justify-center">
+                <h2 class="text-4xl md:text-6xl font-black text-yellow-400 uppercase tracking-widest mb-12 animate-bounce drop-shadow-lg">🏆 Pemenang 🏆</h2>
+                <div class="flex items-end justify-center gap-4 md:gap-8 w-full max-w-6xl h-96 pb-12">
+                    <div class="flex flex-col items-center w-1/3 podium-bar podium-2"><div class="text-white font-black text-lg md:text-3xl mb-2 text-center leading-tight w-full truncate px-2" id="winner2Name">-</div><div class="text-indigo-300 font-bold text-sm md:text-xl mb-3 font-mono" id="winner2Time"></div><div class="w-full h-48 bg-gradient-to-t from-gray-500 to-gray-300 rounded-t-3xl border-4 border-white/20 shadow-2xl flex items-start justify-center pt-4 transform hover:scale-105 transition-transform"><span class="text-6xl font-black text-gray-700/30">2</span></div></div>
+                    <div class="flex flex-col items-center w-1/3 podium-bar podium-1"><div class="text-yellow-300 font-black text-2xl md:text-5xl mb-3 text-center leading-tight drop-shadow-lg w-full truncate px-2" id="winner1Name">-</div><div class="text-yellow-100 font-bold text-lg md:text-2xl mb-4 font-mono" id="winner1Time"></div><div class="w-full h-72 bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t-3xl border-4 border-white/20 shadow-2xl flex items-start justify-center pt-6 relative transform hover:scale-105 transition-transform"><span class="text-8xl font-black text-yellow-700/30">1</span><div class="absolute -top-12 text-7xl animate-bounce">👑</div></div></div>
+                    <div class="flex flex-col items-center w-1/3 podium-bar podium-3"><div class="text-white font-black text-lg md:text-3xl mb-2 text-center leading-tight w-full truncate px-2" id="winner3Name">-</div><div class="text-indigo-300 font-bold text-sm md:text-xl mb-3 font-mono" id="winner3Time"></div><div class="w-full h-32 bg-gradient-to-t from-amber-700 to-amber-500 rounded-t-3xl border-4 border-white/20 shadow-2xl flex items-start justify-center pt-4 transform hover:scale-105 transition-transform"><span class="text-6xl font-black text-amber-900/30">3</span></div></div>
+                </div>
+                <div class="w-full max-w-5xl mt-8 px-8"><h3 class="text-indigo-300 text-xl font-bold uppercase tracking-widest border-b border-indigo-800 pb-2 mb-4 text-center">Senarai Seterusnya</h3><div id="restOfLeaderboard" class="grid grid-cols-2 gap-4 text-left text-white font-bold text-lg"></div></div>
+                <button onclick="hidePodium()" class="absolute top-8 right-8 px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full font-bold transition-all">Kembali</button>
+            </div>
+            <div id="timerSection" class="flex flex-col items-center justify-center w-full max-w-4xl shrink-0 transition-all duration-500">
+                <h2 class="text-indigo-300 text-2xl md:text-4xl font-black uppercase tracking-[0.3em] mb-2 opacity-80 animate-pulse">Masa Berjalan</h2>
+                <div class="lcd-timer font-mono leading-none" id="lcdTimerDisplay">10:00</div>
+                <div class="mt-8 flex items-center gap-4 bg-indigo-900/40 p-3 rounded-3xl backdrop-blur-sm border border-indigo-700">
+                    <select id="lcdTimeSelect" class="bg-transparent text-white text-2xl font-black outline-none cursor-pointer px-6 py-2 border-r border-indigo-700 text-center"><option value="300" class="bg-indigo-900">5 Minit</option><option value="600" class="bg-indigo-900" selected>10 Minit</option><option value="900" class="bg-indigo-900">15 Minit</option><option value="custom" class="bg-indigo-900">Custom...</option></select>
+                    <input type="number" id="lcdCustomTime" class="w-24 bg-white/10 text-white font-black text-xl text-center rounded-xl px-2 py-2 outline-none hidden border border-white/20" placeholder="Min">
+                    <div class="flex gap-3 pl-2">
+                        <button onclick="startLcdCountdown()" id="lcdStartBtn" class="px-10 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xl transition-all shadow-lg active:scale-95">MULA</button>
+                        <button onclick="finishRace()" class="px-10 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xl transition-all shadow-lg active:scale-95">TAMAT</button>
+                        <button onclick="resetLcdCountdown()" class="px-8 py-3 bg-indigo-700 hover:bg-indigo-600 text-indigo-100 rounded-xl font-black text-xl transition-all">RESET</button>
+                    </div>
+                </div>
+            </div>
+            <div id="liveLeaderboardSection" class="w-full max-w-6xl bg-indigo-900/30 rounded-[2rem] border border-indigo-800 backdrop-blur-md overflow-hidden flex flex-col p-8 flex-grow min-h-0 transition-all duration-500">
+                <div class="flex justify-between items-center mb-4 border-b border-indigo-700/50 pb-2 shrink-0"><h3 class="text-white font-black text-2xl uppercase tracking-widest flex items-center gap-3">🏆 Ranking Terpantas <span id="leaderboardCount" class="bg-indigo-600 px-3 py-0.5 rounded-lg text-sm">0</span></h3></div>
+                <div id="lcdLeaderboardList" class="flex-grow overflow-y-auto space-y-3 pr-2 custom-scroll"><p class="text-indigo-400/50 font-bold text-center mt-12 uppercase tracking-widest text-lg animate-pulse">Menunggu data dari telefon guru...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Scanner -->
+    <div id="scannerModal" class="fixed inset-0 bg-black/95 backdrop-blur-md hidden z-50 flex flex-col items-center justify-center p-6 text-center">
+        <h2 class="text-3xl font-black text-white mb-8 uppercase tracking-widest">Imbas Kod</h2>
+        <div id="reader" class="rounded-[2rem] overflow-hidden w-full max-w-sm border-4 border-indigo-600 bg-white"></div>
+        <button onclick="toggleScanner()" class="mt-10 py-4 px-14 bg-white/10 text-white border border-white/20 rounded-2xl font-black text-lg hover:bg-white/20">Tutup</button>
+    </div>
+
+    <!-- 5. Manual Entry -->
+    <div id="entryModal" class="fixed inset-0 bg-black/70 hidden z-[60] flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md p-8 rounded-[3rem] animate-fade-up border-indigo-700 border-t-[15px] text-center shadow-2xl">
+            <h2 class="text-2xl font-black text-indigo-900 mb-2">Rekod Markah</h2>
+            <p id="entryStudentInfo" class="text-indigo-500 font-bold mb-8 text-sm uppercase tracking-wider"></p>
+            <div class="space-y-8">
+                <div><label class="block text-[10px] font-black text-gray-400 uppercase mb-4 text-left pl-1">Sifir</label><div class="grid grid-cols-5 gap-2" id="entrySifirGrid"></div></div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div><label class="block text-[10px] font-black text-gray-400 uppercase mb-3 text-left pl-1">Betul</label><input type="number" id="entryScore" min="0" max="10" class="w-full px-5 py-4 rounded-2xl border-2 border-indigo-50 bg-indigo-50 font-black text-4xl text-center outline-none focus:border-indigo-400"></div>
+                    <div><label class="block text-[10px] font-black text-gray-400 uppercase mb-3 text-left pl-1">Masa</label><input type="number" id="entryTime" placeholder="45" class="w-full px-5 py-4 rounded-2xl border-2 border-indigo-50 bg-indigo-50 font-black text-4xl text-center outline-none focus:border-indigo-400"></div>
+                </div>
+                <button onclick="saveEntry()" class="w-full py-5 bg-indigo-700 text-white rounded-2xl font-black text-xl hover:bg-indigo-800 shadow-lg">Simpan</button>
+                <button onclick="closeEntryModal()" class="w-full py-2 text-gray-400 font-bold uppercase text-[10px] hover:text-red-500">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Remote Scanner -->
+    <div id="remoteScannerModal" class="fixed inset-0 bg-gray-900 hidden z-[120] flex flex-col items-center justify-center p-6 text-center">
+        <h2 class="text-2xl font-black text-white mb-6 uppercase tracking-widest text-emerald-400 animate-pulse">• LIVE CONNECTION •</h2>
+        <div class="w-full max-w-sm bg-black rounded-[2.5rem] overflow-hidden border-4 border-emerald-500 relative shadow-2xl aspect-[3/4]">
+            <div id="remoteScannerVideo" class="w-full h-full bg-gray-800"></div>
+            <div class="absolute top-4 left-4 bg-black/60 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-white border border-white/20">MOD PENGIMBAS GURU</div>
+            <div class="absolute inset-0 border-[40px] border-black/40 pointer-events-none"><div class="border-2 border-white/50 w-full h-full rounded-xl"></div></div>
+        </div>
+        <p class="mt-8 text-gray-400 font-bold text-sm px-6">Imbas kertas murid. Data akan dihantar terus ke LCD.</p>
+        <button onclick="stopRemoteScanner()" class="mt-8 py-4 px-12 bg-red-600 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-transform">TUTUP</button>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast-notification" class="pointer-events-none fixed top-10 left-1/2 transform -translate-x-1/2 z-[200]">
+        <div class="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
+            <span class="text-2xl">✅</span>
+            <div class="text-left"><p class="font-black text-sm" id="toast-name">BERJAYA!</p><p class="text-[10px] font-bold opacity-80" id="toast-desc">Data dihantar</p></div>
+        </div>
+    </div>
+
+    <div id="printArea" class="hidden bg-white"></div>
+
+    <script>
+        // Init vars
+        let peer = null, conn = null, myPeerId = null, liveLeaderboard = [], remoteScannerHtml5QrCode = null, isConnected = false;
+        let currentSifir = null, currentMode = 'learn', lang = 'ms', score = { correct: 0, total: 0 }, activeMultiplier = null, currentSubStep = 0;
+        let timerInterval = null, timeElapsed = 0, html5QrCode = null;
+        let students = JSON.parse(localStorage.getItem('krd_students_v3') || '[]'), records = JSON.parse(localStorage.getItem('krd_records_v3') || '[]');
+        let activeStudent = null, scanTargetSifir = 1, lcdCountdownInterval = null, lcdTimeLeft = 600;
+        let confettiActive = false;
+
+        const krdActions = {
+            1: { val: 1, type: 'plus', display: '+1' }, 2: { val: 2, type: 'plus', display: '+2' },
+            3: { val: 3, type: 'plus', display: '+3' }, 4: { val: 4, type: 'plus', display: '+4' },
+            5: { val: 5, type: 'both', display: '±5' }, 6: { val: 4, type: 'minus', display: '-4' },
+            7: { val: 3, type: 'minus', display: '-3' }, 8: { val: 2, type: 'minus', display: '-2' },
+            9: { val: 1, type: 'minus', display: '-1' }
+        };
+
+        // FUNCTIONS
+        function switchSynergyTab(tab) {
+            const host = document.getElementById('synergyHostView'), client = document.getElementById('synergyClientView');
+            const tHost = document.getElementById('tabHost'), tClient = document.getElementById('tabClient');
+            if(tab === 'host') { host.classList.remove('hidden'); client.classList.add('hidden'); tHost.classList.add('bg-white','text-indigo-900','shadow-sm'); tHost.classList.remove('text-gray-500'); tClient.classList.remove('bg-white','text-indigo-900','shadow-sm'); tClient.classList.add('text-gray-500'); }
+            else { host.classList.add('hidden'); client.classList.remove('hidden'); tClient.classList.add('bg-white','text-indigo-900','shadow-sm'); tClient.classList.remove('text-gray-500'); tHost.classList.remove('bg-white','text-indigo-900','shadow-sm'); tHost.classList.add('text-gray-500'); }
+        }
+        function openSynergyModal() { document.getElementById('synergyModal').classList.remove('hidden'); switchSynergyTab('host'); }
+        function closeSynergyModal() { document.getElementById('synergyModal').classList.add('hidden'); }
+        function initSynergyHost() {
+            document.getElementById('synergyLoading').classList.remove('hidden');
+            const code = Math.random().toString(36).substring(2, 7).toUpperCase(), peerId = `cx-${code}`;
+            if(peer) peer.destroy();
+            peer = new Peer(peerId);
+            peer.on('open', (id) => {
+                myPeerId = id; document.getElementById('synergyLoading').classList.add('hidden');
+                document.getElementById('synergyCodeDisplay').innerText = code;
+                const s = document.getElementById('lcdRemoteStatus'); if(s) s.innerText = `Menunggu (${code})`;
+            });
+            peer.on('connection', (c) => { conn = c; setupConnection(true); });
+            peer.on('error', () => { alert("Ralat ID. Cuba lagi."); initSynergyHost(); });
+        }
+        function joinSynergySession() {
+            const input = document.getElementById('sessionCodeInput').value.trim().toUpperCase();
+            if(!input) return alert("Kod diperlukan.");
+            document.getElementById('synergyLoading').classList.remove('hidden');
+            if(peer) peer.destroy(); peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(`cx-${input}`);
+                conn.on('open', () => { document.getElementById('synergyLoading').classList.add('hidden'); setupConnection(false); });
+                conn.on('error', () => { alert("Gagal sambung."); document.getElementById('synergyLoading').classList.add('hidden'); });
+            });
+        }
+        function setupConnection(isHost) {
+            isConnected = true; closeSynergyModal();
+            document.getElementById('connectionStatus').innerText = isHost ? "HOST MODE" : "REMOTE CONNECTED";
+            document.getElementById('connectionStatus').className = "text-[10px] font-bold text-emerald-500 uppercase tracking-wider animate-pulse";
+            if(isHost) {
+                const s = document.getElementById('lcdRemoteStatus'); if(s) { s.innerText="TERSAMBUNG"; s.classList.add("text-emerald-400"); }
+                alert("Telefon disambungkan!");
+                conn.on('data', (d) => { if(d.type==='SCAN_ENTRY') handleRaceEntry(d.payload); });
+            } else { alert("Berjaya! Telefon kini berfungsi sebagai pengimbas."); startRemoteScanner(); }
+        }
+
+        // --- LCD Logic ---
+        function handleRaceEntry(p) {
+            const sel = document.getElementById('lcdTimeSelect').value;
+            let init = 600; if(sel==='custom') init=(document.getElementById('lcdCustomTime').value||10)*60; else init=parseInt(sel);
+            const elapsed = init - lcdTimeLeft;
+            const m = Math.floor(elapsed / 60), s = elapsed % 60;
+            const timeStr = `${m}m ${s}s`;
+            
+            const exists = liveLeaderboard.find(r => r.name===p.name && r.kls===p.kls);
+            if(exists) return;
+            liveLeaderboard.push({ name:p.name, kls:p.kls, timeStr:timeStr, timestamp:elapsed });
+            updateLCDLeaderboardUI();
+        }
+        function updateLCDLeaderboardUI() {
+            const list = document.getElementById('lcdLeaderboardList'), filter = document.getElementById('lcdClassFilter').value;
+            let data = liveLeaderboard;
+            if(filter!=='all') data = liveLeaderboard.filter(r=>r.kls===filter);
+            data.sort((a,b)=>a.timestamp - b.timestamp);
+            list.innerHTML = ""; document.getElementById('leaderboardCount').innerText = data.length;
+            data.forEach((r,i) => {
+                const el = document.createElement('div');
+                el.className = "leaderboard-item show bg-white/10 p-4 rounded-2xl flex justify-between items-center text-white border border-white/10 mb-2";
+                el.innerHTML = `<div class="flex items-center gap-4"><div class="w-10 h-10 rounded-full bg-white text-indigo-900 font-black flex items-center justify-center text-lg shadow-lg">${i+1}</div><div><p class="font-black leading-tight text-xl truncate max-w-[200px] md:max-w-md">${r.name}</p><p class="text-xs opacity-80 uppercase tracking-widest font-bold text-indigo-200">${r.kls}</p></div></div><p class="font-mono font-black text-emerald-400 text-2xl">${r.timeStr}</p>`;
+                list.appendChild(el);
+            });
+        }
+        function filterLeaderboard() { updateLCDLeaderboardUI(); }
+        function finishRace() {
+            clearInterval(lcdCountdownInterval); lcdCountdownInterval=null; document.getElementById('lcdStartBtn').innerText="MULA";
+            renderPodium();
+        }
+        function renderPodium() {
+            const filter = document.getElementById('lcdClassFilter').value;
+            let data = liveLeaderboard;
+            if(filter!=='all') data = liveLeaderboard.filter(r=>r.kls===filter);
+            data.sort((a,b)=>a.timestamp - b.timestamp);
+            
+            const w = data.slice(0,3);
+            if(w[0]) { document.getElementById('winner1Name').innerText=w[0].name; document.getElementById('winner1Time').innerText=w[0].timeStr; }
+            if(w[1]) { document.getElementById('winner2Name').innerText=w[1].name; document.getElementById('winner2Time').innerText=w[1].timeStr; }
+            if(w[2]) { document.getElementById('winner3Name').innerText=w[2].name; document.getElementById('winner3Time').innerText=w[2].timeStr; }
+            
+            const rc = document.getElementById('restOfLeaderboard'); rc.innerHTML="";
+            data.slice(3,11).forEach((r,i)=>{ rc.innerHTML += `<div class="bg-indigo-900/40 p-3 rounded-xl flex justify-between items-center border border-white/10"><span class="truncate pr-2 max-w-[150px]">${i+4}. ${r.name}</span><span class="font-mono text-emerald-400">${r.timeStr}</span></div>`; });
+            
+            document.getElementById('podiumView').classList.remove('hidden');
+            confettiActive = true;
+            var duration = 1500; var end = Date.now() + duration;
+            (function frame() {
+                if(!confettiActive) return;
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+        function hidePodium() { 
+            document.getElementById('podiumView').classList.add('hidden'); 
+            confettiActive = false;
+            if(window.confetti) window.confetti.reset();
+        }
+        function openLCDMode() { document.getElementById('lcdModal').classList.remove('hidden'); document.getElementById('lcdTimerDisplay').innerText="10:00"; updateClassDropdownLCD(); }
+        function closeLCDMode() { document.getElementById('lcdModal').classList.add('hidden'); resetLcdCountdown(); }
+        function updateClassDropdownLCD() { const d = document.getElementById('lcdClassFilter'), u = [...new Set(students.map(s => s.kls))].sort(); d.innerHTML = '<option value="all">SEMUA</option>' + u.map(c => `<option value="${c}">${c}</option>`).join(''); }
+        function startLcdCountdown() { if(lcdCountdownInterval) { clearInterval(lcdCountdownInterval); lcdCountdownInterval=null; document.getElementById('lcdStartBtn').innerText="SAMBUNG"; return; } const s=document.getElementById('lcdTimeSelect').value; if(lcdTimeLeft==600||lcdTimeLeft==0) lcdTimeLeft=s==='custom'?(document.getElementById('lcdCustomTime').value*60):parseInt(s); document.getElementById('lcdStartBtn').innerText="BERHENTI"; lcdCountdownInterval=setInterval(()=>{lcdTimeLeft--; updateLcdDisplay(); if(lcdTimeLeft<=0){clearInterval(lcdCountdownInterval); lcdCountdownInterval=null; finishRace();}},1000); }
+        function resetLcdCountdown() { clearInterval(lcdCountdownInterval); lcdCountdownInterval=null; lcdTimeLeft=600; updateLcdDisplay(); document.getElementById('lcdStartBtn').innerText="MULA"; liveLeaderboard=[]; updateLCDLeaderboardUI(); }
+        function updateLcdDisplay() { const m=Math.floor(lcdTimeLeft/60).toString().padStart(2,'0'), s=(lcdTimeLeft%60).toString().padStart(2,'0'); document.getElementById('lcdTimerDisplay').innerText=`${m}:${s}`; }
+        document.getElementById('lcdTimeSelect').addEventListener('change',function(){const c=document.getElementById('lcdCustomTime'); if(this.value==='custom')c.classList.remove('hidden'); else{c.classList.add('hidden'); lcdTimeLeft=parseInt(this.value); updateLcdDisplay();} });
+
+        function openStudentManager() { document.getElementById('studentModal').classList.remove('hidden'); renderStudentList(); renderGradebook(); }
+        function closeStudentManager() { document.getElementById('studentModal').classList.add('hidden'); }
+        function openEntryModal() { document.getElementById('entryModal').classList.remove('hidden'); if(activeStudent) document.getElementById('entryStudentInfo').innerText=`${activeStudent.name} (${activeStudent.kls})`; const g=document.getElementById('entrySifirGrid'); g.innerHTML=''; for(let i=1;i<=9;i++) { const b=document.createElement('button'); b.className=`p-2 border rounded ${scanTargetSifir==i?'bg-indigo-600 text-white':'bg-white'}`; b.innerText=i; b.onclick=()=>{scanTargetSifir=i;openEntryModal();}; g.appendChild(b); } }
+        function closeEntryModal() { document.getElementById('entryModal').classList.add('hidden'); }
+        function saveEntry() { const s=document.getElementById('entryScore').value, t=document.getElementById('entryTime').value; if(s&&t) { records.push({name:activeStudent.name,kls:activeStudent.kls,sifir:scanTargetSifir,score:s,time:t,date:new Date().toLocaleDateString()}); localStorage.setItem('krd_records_v3',JSON.stringify(records)); renderGradebook(); closeEntryModal(); } }
+        function exportDatabase() { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify({students,records})],{type:'application/json'})); a.download='circulox.json'; a.click(); }
+        function triggerImport() { document.getElementById('importFile').click(); }
+        function importDatabase(i) { const f=i.files[0]; if(f) { const r=new FileReader(); r.onload=e=>{ try { const d=JSON.parse(e.target.result); students=d.students; records=d.records||[]; localStorage.setItem('krd_students_v3',JSON.stringify(students)); localStorage.setItem('krd_records_v3',JSON.stringify(records)); updateClassDropdown(); renderStudentList(); renderGradebook(); alert("Berjaya"); } catch(x){alert("Gagal");} }; r.readAsText(f); } }
+        
+        function setMode(mode) { currentMode = mode; document.getElementById('scoreCard').classList.toggle('hidden', mode === 'learn'); resetApp(); }
+        function selectSifir(num) { currentSifir = num; resetTimer(); document.querySelectorAll('.sifir-btn').forEach(b => b.classList.remove('border-indigo-600', 'bg-indigo-100')); document.getElementById(`sifir-${num}`).classList.add('border-indigo-600', 'bg-indigo-100'); renderWheel(num); document.getElementById('guideContent').innerHTML = `<div class="text-center mt-12"><h2 class="text-4xl font-black text-pdp-primary tracking-tight">SIFIR ${num}</h2><p class="text-xs font-black text-indigo-400 uppercase tracking-[0.3em] mt-2">Sedia Untuk PdP</p></div>`; }
+        function renderWheel(num) { const w = document.getElementById('wheelWrapper'); w.innerHTML = ''; const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 400 400"); svg.classList.add("w-full","h-full"); for(let i=0; i<10; i++) { const a = i*36-90, rad = ((a+18)*Math.PI)/180; const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", createArcPath(200,200,85,175,a,a+36)); path.setAttribute("fill", "white"); path.setAttribute("stroke", "#e0e7ff"); path.setAttribute("stroke-width", "2.5"); path.onclick = () => handleSegmentClick(i+1); const txt = document.createElementNS("http://www.w3.org/2000/svg", "text"); txt.setAttribute("x", 200+Math.cos(rad)*65); txt.setAttribute("y", 200+Math.sin(rad)*65); txt.setAttribute("text-anchor", "middle"); txt.setAttribute("alignment-baseline", "middle"); txt.textContent = i+1; txt.classList.add("font-black", "fill-indigo-950", "pointer-events-none"); const ans = document.createElementNS("http://www.w3.org/2000/svg", "text"); ans.setAttribute("x", 200+Math.cos(rad)*135); ans.setAttribute("y", 200+Math.sin(rad)*135+5); ans.setAttribute("text-anchor", "middle"); ans.textContent = "??"; ans.id = `ans-${i+1}`; ans.classList.add("font-bold", "fill-indigo-200", "pointer-events-none"); svg.append(path, txt, ans); } const c = document.createElementNS("http://www.w3.org/2000/svg", "circle"); c.setAttribute("cx",200); c.setAttribute("cy",200); c.setAttribute("r",40); c.setAttribute("fill","#4f46e5"); const ct = document.createElementNS("http://www.w3.org/2000/svg", "text"); ct.setAttribute("x",200); ct.setAttribute("y",206); ct.setAttribute("text-anchor","middle"); ct.setAttribute("fill","white"); ct.textContent = `${num}×`; ct.classList.add("font-black","text-2xl"); svg.append(c, ct); w.appendChild(svg); }
+        function handleSegmentClick(m) { if(currentMode==='practice' && !timerInterval && score.total===0) startTimer(); activeMultiplier = m; currentSubStep = 1; updateLearnUI(); }
+        function updateLearnUI() {
+            const m = activeMultiplier, res = currentSifir * m, prevSa = (currentSifir * (m-1)) % 10, currSa = res % 10, action = krdActions[currentSifir];
+            let content = `<h2 class="text-3xl font-black text-pdp-primary mb-6 text-center">${currentSifir} × ${m}</h2>`;
+            if(currentSubStep >= 1) content += `<div class="step-box border-l-8 border-amber-500 bg-amber-50"><p class="text-xs font-black text-amber-700 uppercase mb-2 tracking-widest underline">Langkah 1: Cari Sa</p><div class="flex items-center justify-center gap-6"><div class="text-center"><p class="text-[10px] uppercase font-bold text-gray-400">Sa Lama</p><p class="text-2xl font-black text-gray-700">${prevSa}</p></div><div class="text-2xl font-black text-amber-600">${action.display}</div><div class="text-center"><p class="text-[10px] uppercase font-bold text-gray-400">Sa Baru</p><p class="text-3xl font-black text-amber-800">${currSa}</p></div></div></div>`;
+            if(currentSubStep >= 2) { const rule = (prevSa > currSa && m > 1) ? "Sa Menurun (A): Tambah 1 pada Puluh" : "Sa Naik/Sama (B): Puluh Kekal"; const color = (prevSa > currSa && m > 1) ? "text-red-600" : "text-emerald-600"; content += `<div class="step-box border-l-8 border-indigo-500 bg-indigo-50"><p class="text-xs font-black text-indigo-700 uppercase mb-2 tracking-widest underline">Langkah 2: Cari Puluh</p><p class="text-lg font-black ${color} text-center leading-tight">${rule}</p></div>`; }
+            if(currentSubStep === 3) { const ans = document.getElementById(`ans-${m}`); ans.textContent = res < 10 ? `0${res}` : res; ans.classList.replace('fill-indigo-200', 'fill-indigo-900'); content += `<div class="mt-6 p-8 bg-indigo-800 text-white rounded-[2rem] text-center shadow-2xl animate-fade-up"><p class="text-xs font-black uppercase opacity-60 mb-1 tracking-widest">Jawapan Akhir</p><p class="text-6xl font-black">${res}</p></div>`; document.getElementById('guideActions').innerHTML = `<button onclick="selectSifir(${currentSifir})" class="w-full py-4 bg-gray-100 rounded-2xl font-black text-gray-500 hover:bg-indigo-50 transition-all shadow-sm">Teruskan Seterusnya!</button>`; } else { document.getElementById('guideActions').innerHTML = `<button onclick="currentSubStep++; updateLearnUI();" class="w-full py-4 bg-indigo-700 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-800 transition-all">Langkah Seterusnya</button>`; }
+            document.getElementById('guideContent').innerHTML = content;
+        }
+
+        // --- FIXED PDF LOGIC (ASYNC QR) ---
+        function generateTestByClass() { 
+            const c=document.getElementById('printClassSelect').value, t=c==='all'?students:students.filter(s=>s.kls===c); if(!t.length) return alert("Tiada data");
+            const p=document.getElementById('printArea'); p.innerHTML='';
+            
+            // Build Structure
+            t.forEach((s,i)=>{
+                const d=document.createElement('div'); d.className='page-break p-10 border-4 m-4';
+                d.innerHTML=`<div class="flex justify-between border-b-4 pb-4 mb-4"><div><h1 class="text-4xl font-black">CIRCULOX</h1><p class="text-xl font-bold">${s.name}</p><p>${s.kls}</p></div><div id="qr-${i}"></div></div><div class="grid grid-cols-2 gap-4">${Array.from({length:8},(_,j)=>`<div class="border-2 p-2 flex flex-col items-center"><p class="font-black text-lg">x${j+2}</p><div class="h-32 w-32 border rounded-full relative"><svg viewBox="0 0 400 400" class="absolute inset-0 w-full h-full">${Array.from({length:10},(_,k)=>{const a=k*36-90,r=((a+18)*Math.PI)/180;return`<path d="${createArcPath(200,200,85,175,a,a+36)}" fill="none" stroke="black" stroke-width="4"/><text x="${200+Math.cos(r)*65}" y="${200+Math.sin(r)*65}" text-anchor="middle" font-size="28" font-weight="900" alignment-baseline="middle">${k+1}</text><text x="${200+Math.cos(r)*112}" y="${200+Math.sin(r)*115}" text-anchor="middle" font-size="24" fill="#ccc">__</text>`;}).join('')}<circle cx="200" cy="200" r="45" fill="none" stroke="black" stroke-width="6"/></svg></div></div>`).join('')}</div><div class="mt-4 border-t-4 pt-2 flex justify-between font-bold text-xl"><p>MARKAH: _____ / 80</p><p>MASA: ________</p></div>`;
+                p.appendChild(d);
+            });
+
+            // Delay for QRs then Print
+            setTimeout(()=>{
+                t.forEach((s,i)=>{ new QRCode(document.getElementById(`qr-${i}`),{text:`LOGIN:${s.name}|${s.kls}`,width:100,height:100,correctLevel:QRCode.CorrectLevel.L}); });
+                setTimeout(()=>window.print(), 1500);
+            }, 500);
+        }
+
+        // --- Smooth Scanner (No Alert) ---
+        function toggleScanner() { 
+            const m = document.getElementById('scannerModal'); 
+            if(!m.classList.contains('hidden')) { if(html5QrCode) html5QrCode.stop().then(()=>html5QrCode.clear()); m.classList.add('hidden'); }
+            else { 
+                m.classList.remove('hidden'); html5QrCode = new Html5Qrcode("reader"); 
+                html5QrCode.start({facingMode:"environment"}, {fps:25,qrbox:250}, (t)=>{ 
+                    try {
+                        if(t.startsWith("LOGIN:")) { 
+                            const p = t.replace("LOGIN:","").split("|");
+                            playBeep();
+                            showToast("MURID DIKESAN");
+                            activeStudent={name:p[0],kls:p[1]}; 
+                            // Stop & Open Form Automatically
+                            html5QrCode.stop().then(() => {
+                                html5QrCode.clear();
+                                m.classList.add('hidden');
+                                openEntryModal();
+                            });
+                        }
+                    } catch(e) {}
+                }); 
+            }
+        }
+        function startRemoteScanner() { document.getElementById('remoteScannerModal').classList.remove('hidden'); startHtml5RemoteScanner(); }
+        function startHtml5RemoteScanner() {
+            if(remoteScannerHtml5QrCode) return;
+            remoteScannerHtml5QrCode = new Html5Qrcode("remoteScannerVideo");
+            remoteScannerHtml5QrCode.start({ facingMode: "environment" }, { fps: 25, qrbox: { width: 300, height: 300 } }, (t) => {
+                if(t.startsWith("LOGIN:")) {
+                    const p = t.replace("LOGIN:", "").split("|");
+                    if(conn && conn.open) {
+                        conn.send({ type: 'SCAN_ENTRY', payload: { name: p[0], kls: p[1] } });
+                        playBeep(); showToast("DATA DIHANTAR");
+                        if(navigator.vibrate) navigator.vibrate(100);
+                        remoteScannerHtml5QrCode.pause(true);
+                        setTimeout(() => remoteScannerHtml5QrCode.resume(), 1200);
+                    }
+                }
+            });
+        }
+        function stopRemoteScanner() { if(remoteScannerHtml5QrCode) remoteScannerHtml5QrCode.stop().then(() => { document.getElementById('remoteScannerModal').classList.add('hidden'); remoteScannerHtml5QrCode = null; }); else document.getElementById('remoteScannerModal').classList.add('hidden'); }
+        function playBeep() { const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=1000;o.type="sine";g.gain.value=0.1;o.start();g.gain.exponentialRampToValueAtTime(0.00001,c.currentTime+0.1);setTimeout(()=>o.stop(),100); }
+        function showToast(msg) { const t=document.getElementById('toast-notification'); document.getElementById('toast-name').innerText=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
+
+        function createArcPath(x,y,r1,r2,a1,a2) { const rad1=a1*Math.PI/180, rad2=a2*Math.PI/180; return `M ${x+Math.cos(rad1)*r2} ${y+Math.sin(rad1)*r2} A ${r2} ${r2} 0 0 1 ${x+Math.cos(rad2)*r2} ${y+Math.sin(rad2)*r2} L ${x+Math.cos(rad2)*r1} ${y+Math.sin(rad2)*r1} A ${r1} ${r1} 0 0 0 ${x+Math.cos(rad1)*r1} ${y+Math.sin(rad1)*r1} Z`; }
+        function startTimer() { if(!timerInterval) { const s = Date.now(); timerInterval = setInterval(() => { const t = Math.floor((Date.now()-s)/1000); document.getElementById('timerDisplay').innerText = t; }, 1000); } }
+        function resetTimer() { clearInterval(timerInterval); timerInterval=null; if(document.getElementById('timerDisplay')) document.getElementById('timerDisplay').innerText="00:00"; }
+        function resetApp() { currentSifir=null; score={correct:0,total:0}; resetTimer(); if(document.getElementById('wheelWrapper')) document.getElementById('wheelWrapper').innerHTML = `<span class="text-indigo-100 font-black text-center p-8 text-xl uppercase tracking-widest leading-tight">Sila Pilih Sifir</span>`; document.getElementById('guideContent').innerHTML = `<div class="text-center py-12"><div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><h2 class="text-2xl font-black text-pdp-primary mb-3">Panduan PdP</h2><p class="text-sm text-gray-500 font-bold leading-relaxed px-4">Sila pilih murid dan sifir di bahagian kiri untuk memulakan sesi pembelajaran interaktif.</p></div>`; document.getElementById('guideActions').innerHTML = ""; document.querySelectorAll('.sifir-btn').forEach(b => b.classList.remove('border-indigo-600', 'bg-indigo-50', 'text-indigo-900', 'ring-2', 'ring-indigo-200')); document.querySelectorAll('[id^="mnl-"]').forEach(m => m.classList.remove('mnl-active')); }
+        function updateClassDropdown() { const d=document.getElementById('classDropdown'), p=document.getElementById('printClassSelect'), u=[...new Set(students.map(s=>s.kls))].sort(); const h='<option value="">Pilih...</option>'+u.map(c=>`<option value="${c}">${c}</option>`).join(''); d.innerHTML=h; p.innerHTML='<option value="all">SEMUA KELAS</option>'+u.map(c=>`<option value="${c}">${c}</option>`).join(''); }
+        function loadStudentsByClass() { const k=document.getElementById('classDropdown').value, d=document.getElementById('studentDropdown'); if(k) d.innerHTML='<option value="">Pilih...</option>'+students.filter(s=>s.kls===k).map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); else d.innerHTML='<option value="">Pilih...</option>'; }
+        function selectStudentFromList() { const n=document.getElementById('studentDropdown').value, k=document.getElementById('classDropdown').value; activeStudent=students.find(s=>s.name===n&&s.kls===k); updateStudentUI(); }
+        function updateStudentUI() { if(activeStudent) { document.getElementById('studentDetail').classList.remove('hidden'); document.getElementById('noStudentText').classList.add('hidden'); document.getElementById('activeStudentInfo').classList.remove('hidden'); document.getElementById('dispName').innerText=activeStudent.name; document.getElementById('dispClass').innerText=activeStudent.kls; } }
+        function addStudent() { const n=document.getElementById('addName').value, k=document.getElementById('addClass').value; if(n&&k) { students.push({name:n,kls:k}); localStorage.setItem('krd_students_v3',JSON.stringify(students)); updateClassDropdown(); renderStudentList(); document.getElementById('addName').value=''; document.getElementById('addClass').value=''; } }
+        function addBulkStudents() { const r=document.getElementById('bulkInput').value; if(r) { r.split('\n').forEach(l=>{const p=l.split(','); if(p.length>=2) students.push({name:p[0].trim(),kls:p[1].trim().toUpperCase()});}); localStorage.setItem('krd_students_v3',JSON.stringify(students)); updateClassDropdown(); renderStudentList(); document.getElementById('bulkInput').value=''; } }
+        function renderStudentList() { const l=document.getElementById('studentListContainer'); l.innerHTML=''; [...students].reverse().forEach((s,i)=>{ l.innerHTML+=`<div class="flex justify-between p-2 border-b"><span>${s.name} (${s.kls})</span><button onclick="removeStudent(${students.length-1-i})" class="text-red-500">x</button></div>`; }); }
+        function removeStudent(i) { students.splice(i,1); localStorage.setItem('krd_students_v3',JSON.stringify(students)); renderStudentList(); updateClassDropdown(); }
+        function renderGradebook() { const l=document.getElementById('gradebookList'); l.innerHTML=''; [...records].reverse().forEach(r=>{ l.innerHTML+=`<div class="p-2 border-b text-xs"><b>${r.name}</b>: Sifir ${r.sifir} | ${r.score}/10 | ${r.time}s</div>`; }); }
+        function clearAllData() { if(confirm("Padam?")) { students=[]; records=[]; localStorage.clear(); updateClassDropdown(); renderStudentList(); renderGradebook(); } }
+
+        // Init
+        updateClassDropdown(); renderStudentList(); renderGradebook(); resetApp();
+    </script>
+</body>
+</html>
